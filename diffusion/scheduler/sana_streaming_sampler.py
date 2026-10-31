@@ -213,6 +213,10 @@ class SANAStreamingSampler:
             start_f = chunk_indices[chunk_idx]
             end_f = chunk_indices[chunk_idx + 1]
             current_num_frames = end_f - start_f
+            # Optional V2V streaming input hook: populate this chunk's reference
+            # latents only after the corresponding source frames have arrived.
+            if kwargs.get("before_chunk") is not None:
+                kwargs["before_chunk"](start_f, end_f)
             cache_start_chunk_idx = max(chunk_idx - self.num_cached_blocks, 0) if self.num_cached_blocks > 0 else 0
 
             frame_index = None
@@ -297,5 +301,9 @@ class SANAStreamingSampler:
                 )
                 kv_cache[chunk_idx] = updated_kv_cache
                 self._promote_fixed_rope_full_history_cache(kv_cache, chunk_idx)
+
+            # All denoising and cache updates for this chunk are complete.
+            if kwargs.get("on_chunk") is not None:
+                kwargs["on_chunk"](latents, start_f, end_f, is_last_chunk)
 
         return latents
